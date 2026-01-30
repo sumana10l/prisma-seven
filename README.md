@@ -41,3 +41,5 @@ npx tsx script.ts
 ```
 
 
+> Having trouble or want to build this from scratch?  
+> See [SETUP.md](./SETUP.md)
