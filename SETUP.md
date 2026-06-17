@@ -43,10 +43,9 @@ npm install @prisma/client @prisma/adapter-pg pg dotenv
   "compilerOptions": {
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "target": "ES2023",
+    "target": "ES6",
     "strict": true,
-    "esModuleInterop": true,
-    "ignoreDeprecations": "6.0"
+    "esModuleInterop": true
   }
 }
 ```
@@ -156,21 +155,28 @@ async function main() {
     data: {
       name: 'Alice',
       email: `alice${Date.now()}@prisma.io`,
-      posts: {
+      travelPlans: {
         create: {
-          title: 'Hello World',
-          content: 'This is my first post!',
-          published: true,
+          title: 'Japan Vacation',
+          destinationCity: 'Tokyo',
+          destinationCountry: 'Japan',
+          startDate: new Date('2026-07-01'),
+          endDate: new Date('2026-07-10'),
+          budget: 2500,
         },
       },
     },
-    include: { posts: true },
+    include: {
+      travelPlans: true,
+    },
   })
 
   console.log('Created user:', user)
 
   const allUsers = await prisma.user.findMany({
-    include: { posts: true },
+    include: {
+      travelPlans: true,
+    },
   })
 
   console.log('All users:', JSON.stringify(allUsers, null, 2))
@@ -178,7 +184,9 @@ async function main() {
 
 main()
   .catch(console.error)
-  .finally(() => prisma.$disconnect())
+  .finally(async () => {
+    await prisma.$disconnect()
+  })
 ```
 
 ---
