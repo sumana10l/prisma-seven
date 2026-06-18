@@ -1,6 +1,6 @@
 # hello-prisma
 
-A minimal Prisma + PostgreSQL setup using **TypeScript**, **tsx**, and **Docker**.
+A minimal Prisma + PostgreSQL + Express setup using **TypeScript**, **tsx**, and **Docker**.
 
 ---
 
@@ -25,13 +25,12 @@ npm init -y
 ### 2. Install Dependencies
 
 ```bash
-npm install typescript tsx @types/node --save-dev
+npm install typescript tsx @types/node @types/express express --save-dev
 npx tsc --init
 
 npm install prisma @types/node @types/pg --save-dev
-npm install @prisma/client @prisma/adapter-pg pg dotenv
+npm install @prisma/client @prisma/adapter-pg pg dotenv express
 ```
-
 ---
 
 ## Configuration
@@ -41,23 +40,21 @@ npm install @prisma/client @prisma/adapter-pg pg dotenv
 ```json
 {
   "compilerOptions": {
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "target": "ES6",
+    "target": "es2022",
+    "module": "esnext",
+    "moduleResolution": "node",
     "strict": true,
-    "esModuleInterop": true
+    "esModuleInterop": true,
+    "skipLibCheck": true
   }
 }
 ```
 
-### `package.json`
+Update your `package.json` scripts:
 
 ```json
-{
-  "type": "module",
-  "scripts": {
-    "dev": "tsx script.ts"
-  }
+"scripts": {
+  "dev": "tsx watch server.ts"
 }
 ```
 
@@ -71,29 +68,12 @@ npm install @prisma/client @prisma/adapter-pg pg dotenv
 npx prisma init
 ```
 
-### `prisma.config.ts`
-
-```ts
-import 'dotenv/config'
-import { defineConfig, env } from 'prisma/config'
-
-export default defineConfig({
-  schema: 'prisma/schema.prisma',
-  migrations: {
-    path: 'prisma/migrations',
-  },
-  datasource: {
-    url: env('DATABASE_URL'),
-  },
-})
-```
-
 ### Environment Variables
 
 Create `.env`:
 
 ```env
-DATABASE_URL="postgresql://postgres:mypassword@localhost:5432/postgres"
+DATABASE_URL="postgresql://postgres:mypassword@localhost:5432/mydb"
 ```
 
 ---
@@ -102,17 +82,49 @@ DATABASE_URL="postgresql://postgres:mypassword@localhost:5432/postgres"
 
 ```bash
 docker run -e POSTGRES_PASSWORD=mypassword \
--e POSTGRES_DB=mydb \
--d -p 5432:5432 \
---name postgres-db-new \
-postgres
+  -e POSTGRES_DB=mydb \
+  -d -p 5432:5432 \
+  --name postgres-db-new \
+  postgres
 ```
 
 ---
 
 ## Prisma Schema
 
-Update `prisma/schema.prisma` with your models.
+`prisma/schema.prisma`:
+
+```prisma
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id          Int      @id @default(autoincrement())
+  username    String?
+  password    String?
+  name        String?
+  email       String   @unique
+  travelPlans TravelPlan[]
+}
+
+model TravelPlan {
+  id                  Int     @id @default(autoincrement())
+  userId              Int
+  user                User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title               String
+  destinationCity     String
+  destinationCountry  String
+  startDate           DateTime
+  endDate             DateTime
+  budget              Int?
+}
+```
 
 ---
 
@@ -132,7 +144,7 @@ npx prisma generate
 ```ts
 import 'dotenv/config'
 import { PrismaPg } from '@prisma/adapter-pg'
-import { PrismaClient } from '../generated/prisma/client'
+import { PrismaClient } from '@prisma/client'
 
 const adapter = new PrismaPg({
   connectionString: process.env.DATABASE_URL!,
@@ -143,60 +155,43 @@ export const prisma = new PrismaClient({ adapter })
 
 ---
 
-## Example Script
+## Express Server
 
-### `script.ts`
+### Create `server.ts`
 
-```ts
-import { prisma } from './lib/prisma'
+Create a new file `server.ts` with an Express app that:
+- Listens on port 3000
+- Implements CRUD routes for Users and Travel Plans
+- Uses Prisma client to interact with the database
 
-async function main() {
-  const user = await prisma.user.create({
-    data: {
-      name: 'Alice',
-      email: `alice${Date.now()}@prisma.io`,
-      travelPlans: {
-        create: {
-          title: 'Japan Vacation',
-          destinationCity: 'Tokyo',
-          destinationCountry: 'Japan',
-          startDate: new Date('2026-07-01'),
-          endDate: new Date('2026-07-10'),
-          budget: 2500,
-        },
-      },
-    },
-    include: {
-      travelPlans: true,
-    },
-  })
-
-  console.log('Created user:', user)
-
-  const allUsers = await prisma.user.findMany({
-    include: {
-      travelPlans: true,
-    },
-  })
-
-  console.log('All users:', JSON.stringify(allUsers, null, 2))
-}
-
-main()
-  .catch(console.error)
-  .finally(async () => {
-    await prisma.$disconnect()
-  })
-```
+See the [server.ts example](./server.ts) for full implementation.
 
 ---
 
-## Run the App
+## Run the Server
 
 ```bash
 npm run dev
 ```
 
+Server starts on `http://localhost:3000`
+
+## Testing
+
+### Create `test-api.sh`
+
+Create a bash script that tests all API endpoints using `curl`:
+
+See the [test-api.sh example](./test-api.sh) for full script.
+
+
+### Run Tests
+
+```bash
+chmod +x test-api.sh
+./test-api.sh
+```
+
+**Make sure the server is running** in another terminal (`npm run dev`) before running tests.
+
 ---
-
-
