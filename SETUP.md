@@ -95,34 +95,35 @@ docker run -e POSTGRES_PASSWORD=mypassword \
 `prisma/schema.prisma`:
 
 ```prisma
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
 }
 
-generator client {
-  provider = "prisma-client-js"
+datasource db {
+  provider = "postgresql"
 }
 
 model User {
-  id          Int      @id @default(autoincrement())
-  username    String?
-  password    String?
-  name        String?
-  email       String   @unique
+  id       Int      @id @default(autoincrement())
+  username String?   @unique
+  password String?
+  name     String
+  email    String @unique
   travelPlans TravelPlan[]
 }
 
 model TravelPlan {
-  id                  Int     @id @default(autoincrement())
-  userId              Int
-  user                User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  title               String
-  destinationCity     String
-  destinationCountry  String
-  startDate           DateTime
-  endDate             DateTime
-  budget              Int?
+  id                 Int      @id @default(autoincrement())
+  userId             Int
+  title              String
+  destinationCity    String
+  destinationCountry String
+  startDate          DateTime
+  endDate            DateTime
+  budget             Float?
+
+  user User @relation(fields: [userId], references: [id])
 }
 ```
 
@@ -142,15 +143,16 @@ npx prisma generate
 ### `lib/prisma.ts`
 
 ```ts
-import 'dotenv/config'
+import "dotenv/config";
 import { PrismaPg } from '@prisma/adapter-pg'
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient } from '../generated/prisma/client'
 
-const adapter = new PrismaPg({
-  connectionString: process.env.DATABASE_URL!,
-})
+const connectionString = `${process.env.DATABASE_URL}`
 
-export const prisma = new PrismaClient({ adapter })
+const adapter = new PrismaPg({ connectionString })
+const prisma = new PrismaClient({ adapter })
+
+export { prisma }
 ```
 
 ---
