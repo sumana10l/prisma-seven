@@ -1,14 +1,14 @@
-# hello-prisma
+# bun-prisma
 
-A minimal Prisma + PostgreSQL setup using **TypeScript**, **tsx**, and **Docker**.
+A minimal **Bun + Prisma + PostgreSQL** setup using **TypeScript** and **Docker**.
 
 ---
 
 ## Prerequisites
 
-* Node.js (v18+ recommended)
-* Docker
-* npm
+- Bun
+- Docker
+- PostgreSQL (via Docker)
 
 ---
 
@@ -17,48 +17,20 @@ A minimal Prisma + PostgreSQL setup using **TypeScript**, **tsx**, and **Docker*
 ### 1. Initialize Project
 
 ```bash
-mkdir hello-prisma
-cd hello-prisma
-npm init -y
+mkdir bun-prisma
+cd bun-prisma
+
+bun init
 ```
 
 ### 2. Install Dependencies
 
 ```bash
-npm install typescript tsx @types/node --save-dev
-npx tsc --init
+# Development dependencies
+bun add prisma @types/pg --dev
 
-npm install prisma @types/node @types/pg --save-dev
-npm install @prisma/client @prisma/adapter-pg pg dotenv
-```
-
----
-
-## Configuration
-
-### `tsconfig.json`
-
-```json
-{
-  "compilerOptions": {
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "target": "ES6",
-    "strict": true,
-    "esModuleInterop": true
-  }
-}
-```
-
-### `package.json`
-
-```json
-{
-  "type": "module",
-  "scripts": {
-    "dev": "tsx script.ts"
-  }
-}
+# Runtime dependencies
+bun add @prisma/client @prisma/adapter-pg pg
 ```
 
 ---
@@ -68,29 +40,14 @@ npm install @prisma/client @prisma/adapter-pg pg dotenv
 ### Initialize Prisma
 
 ```bash
-npx prisma init
+bunx --bun prisma init
 ```
 
-### `prisma.config.ts`
+---
 
-```ts
-import 'dotenv/config'
-import { defineConfig, env } from 'prisma/config'
+## Environment Variables
 
-export default defineConfig({
-  schema: 'prisma/schema.prisma',
-  migrations: {
-    path: 'prisma/migrations',
-  },
-  datasource: {
-    url: env('DATABASE_URL'),
-  },
-})
-```
-
-### Environment Variables
-
-Create `.env`:
+Create a `.env` file.
 
 ```env
 DATABASE_URL="postgresql://postgres:mypassword@localhost:5432/postgres"
@@ -101,102 +58,171 @@ DATABASE_URL="postgresql://postgres:mypassword@localhost:5432/postgres"
 ## Database (Docker)
 
 ```bash
-docker run -e POSTGRES_PASSWORD=mypassword \
--e POSTGRES_DB=mydb \
--d -p 5432:5432 \
+docker run \
+-e POSTGRES_PASSWORD=mypassword \
+-e POSTGRES_DB=postgres \
+-d \
+-p 5432:5432 \
 --name postgres-db-new \
 postgres
 ```
 
 ---
 
-## Prisma Schema
+## Prisma Configuration
 
-Update `prisma/schema.prisma` with your models.
+### `prisma.config.ts`
+
+```ts
+import { defineConfig, env } from "prisma/config";
+import "dotenv/config";
+
+export default defineConfig({
+  schema: "prisma/schema.prisma",
+  migrations: {
+    path: "prisma/migrations",
+  },
+  datasource: {
+    url: env("DATABASE_URL"),
+  },
+});
+```
 
 ---
 
-## Migrations & Client
+## Prisma Schema
+
+Update `prisma/schema.prisma`.
+
+```prisma
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id    Int    @id @default(autoincrement())
+  email String @unique
+  name  String?
+}
+```
+
+---
+
+## Generate Migration & Client
 
 ```bash
-npx prisma migrate dev --name init
-npx prisma generate
+bunx prisma migrate dev --name init
+
+bunx prisma generate
 ```
 
 ---
 
 ## Prisma Client Setup
 
-### `lib/prisma.ts`
+Create `lib/prisma.ts`.
 
 ```ts
-import 'dotenv/config'
-import { PrismaPg } from '@prisma/adapter-pg'
-import { PrismaClient } from '../generated/prisma/client'
+import "dotenv/config";
+import { PrismaClient } from "../generated/prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
 
 const adapter = new PrismaPg({
   connectionString: process.env.DATABASE_URL!,
-})
+});
 
-export const prisma = new PrismaClient({ adapter })
+export const prisma = new PrismaClient({
+  adapter,
+});
 ```
 
 ---
 
 ## Example Script
 
-### `script.ts`
+### `index.ts`
 
 ```ts
-import { prisma } from './lib/prisma'
+import { prisma } from "./lib/prisma";
 
-async function main() {
-  const user = await prisma.user.create({
-    data: {
-      name: 'Alice',
-      email: `alice${Date.now()}@prisma.io`,
-      travelPlans: {
-        create: {
-          title: 'Japan Vacation',
-          destinationCity: 'Tokyo',
-          destinationCountry: 'Japan',
-          startDate: new Date('2026-07-01'),
-          endDate: new Date('2026-07-10'),
-          budget: 2500,
+const server = Bun.serve({
+  port: 3000,
+
+  async fetch(req) {
+    const { pathname } = new URL(req.url);
+
+    if (pathname === "/favicon.ico") {
+      return new Response(null, { status: 204 });
+    }
+
+    if (pathname === "/") {
+      // Insert sample user
+      const newUser = await prisma.user.create({
+        data: {
+          name: "John Doe",
+          email: `john${Date.now()}@example.com`,
         },
-      },
-    },
-    include: {
-      travelPlans: true,
-    },
-  })
+      });
 
-  console.log('Created user:', user)
+      // Fetch all users
+      const users = await prisma.user.findMany();
 
-  const allUsers = await prisma.user.findMany({
-    include: {
-      travelPlans: true,
-    },
-  })
+      return Response.json({
+        message: "User inserted successfully!",
+        insertedUser: newUser,
+        totalUsers: users.length,
+        users,
+      });
+    }
 
-  console.log('All users:', JSON.stringify(allUsers, null, 2))
-}
+    return new Response("Not Found", { status: 404 });
+  },
+});
 
-main()
-  .catch(console.error)
-  .finally(async () => {
-    await prisma.$disconnect()
-  })
+console.log(`Listening on http://localhost:${server.port}`);
 ```
 
 ---
 
-## Run the App
+## Run the Application
 
 ```bash
-npm run dev
+bun run index.ts
 ```
 
 ---
 
+## Open Prisma Studio
 
+```bash
+bunx prisma studio
+```
+
+---
+
+## Project Structure
+
+```text
+bun-prisma/
+│
+├── generated/
+│   └── prisma/
+│
+├── prisma/
+│   ├── migrations/
+│   └── schema.prisma
+│
+├── lib/
+│   └── prisma.ts
+│
+├── index.ts
+├── prisma.config.ts
+├── package.json
+├── bun.lock
+└── .env
+```

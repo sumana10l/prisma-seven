@@ -1,26 +1,19 @@
 {
-  "name": "hello-prisma",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "name": "bun-prisma",
+  "module": "index.ts",
   "type": "module",
+  "private": true,
   "devDependencies": {
-    "@types/node": "^24.10.1",
-    "@types/pg": "^8.15.6",
-    "prisma": "^7.0.0",
-    "tsx": "^4.20.6",
-    "typescript": "^5.9.3"
+    "@types/bun": "latest",
+    "@types/pg": "^8.20.0",
+    "prisma": "^7.9.0"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
   },
   "dependencies": {
-    "@prisma/adapter-pg": "^7.0.0",
-    "@prisma/client": "^7.0.0",
-    "dotenv": "^17.2.3",
-    "pg": "^8.16.3"
+    "@prisma/adapter-pg": "^7.9.0",
+    "@prisma/client": "^7.9.0",
+    "pg": "^8.22.0"
   }
 }
